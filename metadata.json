@@ -1,0 +1,6 @@
+{
+  "name": "CareTrack Secure - Client & Volunteer Updates",
+  "description": "Secure, privacy-first tracker and AI summarizer for client, family, and volunteer updates with identity masking and PIN protection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
