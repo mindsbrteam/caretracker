@@ -1,13 +1,13 @@
 /**
- * CareTrack Secure - Live Google Sheets Multi-Tab Sync Controller
+ * CareTrack Secure - Bulletproof Live Sync Controller
+ * Prevents HTML response corruption and guarantees instant login.
  */
 
 const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
-// Your Google Sheet Tabs: Accounts and Profiles have unique GIDs
-const ACCOUNTS_GID = "0"; // Default first tab (Accounts)
-const PROFILES_GID = "266849651"; // Profiles tab GID from your URL
+const ACCOUNTS_GID = "0";
+const PROFILES_GID = "266849651";
 
-const FALLBACK_USERS = [
+const GUARANTEED_USERS = [
   { id: 'U-001', username: 'admin', password: '1234', role: 'admin' },
   { id: 'U-002', username: 'Julia', password: '8502', role: 'admin' },
   { id: 'U-003', username: 'caregiver_david', password: '1111', role: 'caregiver' },
@@ -29,7 +29,10 @@ class AppState {
     this.darkMode = localStorage.getItem('caretrack_dark') === 'true';
     this.activeTab = 'clients';
 
-    this.users = JSON.parse(localStorage.getItem('caretrack_users') || 'null') || FALLBACK_USERS;
+    // Force reset corrupted user caches from previous broken runs
+    localStorage.removeItem('caretrack_users');
+    this.users = GUARANTEED_USERS;
+
     this.profiles = JSON.parse(localStorage.getItem('caretrack_profiles') || 'null') || DEFAULT_PROFILES;
     this.updates = JSON.parse(localStorage.getItem('caretrack_updates') || 'null') || [];
     
@@ -38,7 +41,6 @@ class AppState {
   }
 
   save() {
-    localStorage.setItem('caretrack_users', JSON.stringify(this.users));
     localStorage.setItem('caretrack_dark', this.darkMode);
     localStorage.setItem('caretrack_profiles', JSON.stringify(this.profiles));
     localStorage.setItem('caretrack_updates', JSON.stringify(this.updates));
@@ -55,6 +57,11 @@ function canSeeCategory(category, role) {
 }
 
 function parseCSV(text) {
+  // Safety check: if Google returned an HTML error page, do not parse it
+  if (!text || text.trim().startsWith('<!DOCTYPE') || text.includes('<html')) {
+    throw new Error('Google Sheets returned HTML instead of CSV. Sheet may not be published to the web.');
+  }
+
   const lines = text.trim().split(/\r?\n/);
   const result = [];
   
@@ -83,9 +90,6 @@ function parseCSV(text) {
   return result;
 }
 
-/**
- * Syncs both tabs (Accounts & Profiles) in parallel from Google Sheets
- */
 async function syncLiveGoogleSheets() {
   const accountsUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${ACCOUNTS_GID}`;
   const profilesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${PROFILES_GID}`;
@@ -96,46 +100,38 @@ async function syncLiveGoogleSheets() {
       fetch(profilesUrl).catch(() => null)
     ]);
 
-    // 1. Parse Accounts Tab
     if (accRes && accRes.ok) {
       const csvText = await accRes.text();
       const rows = parseCSV(csvText);
       const parsedUsers = [];
 
-      // Skip header row (index 0)
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        // Columns: User ID (0), Username (1), PIN (2), Role (3)
-        if (row.length >= 4 && row[1] && row[2]) {
+        if (row.length >= 3 && row[1] && row[2]) {
           parsedUsers.push({
             id: row[0] || `u-${i}`,
             username: row[1],
             password: String(row[2]).trim(),
-            role: String(row[3]).trim().toLowerCase()
+            role: String(row[3] || 'volunteer').trim().toLowerCase()
           });
         }
       }
 
       if (parsedUsers.length > 0) {
-        // Merge with fallback to guarantee Julia (8502) and David (1111) are always present
         const map = new Map();
-        FALLBACK_USERS.forEach(u => map.set(String(u.password).trim(), u));
+        GUARANTEED_USERS.forEach(u => map.set(String(u.password).trim(), u));
         parsedUsers.forEach(u => map.set(String(u.password).trim(), u));
         state.users = Array.from(map.values());
-        localStorage.setItem('caretrack_users', JSON.stringify(state.users));
       }
     }
 
-    // 2. Parse Profiles Tab
     if (profRes && profRes.ok) {
       const csvText = await profRes.text();
       const rows = parseCSV(csvText);
       const parsedProfiles = [];
 
-      // Skip header row (index 0)
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        // Columns: Profile ID (0), Profile Type (1), Full Name (2), Pseudonym (3), Membership Tier (4), Membership Month (5), Primary Category (6), Urgent Case (7)
         if (row.length >= 3 && row[2]) {
           parsedProfiles.push({
             id: row[0] || `p-${i}`,
@@ -152,15 +148,14 @@ async function syncLiveGoogleSheets() {
 
       if (parsedProfiles.length > 0) {
         state.profiles = parsedProfiles;
-        localStorage.setItem('caretrack_profiles', JSON.stringify(state.profiles));
       }
     }
 
     state.save();
     renderApp();
-    console.log("Successfully synced both tabs from Google Sheets!");
+    console.log("Successfully synced live data from Google Sheets!");
   } catch (error) {
-    console.warn("Using offline fallback storage:", error);
+    console.warn("Google Sheets sync skipped (using guaranteed local accounts):", error.message);
   }
 }
 
@@ -185,14 +180,15 @@ function handleUserLogin() {
 
   let matchedUser = null;
 
-  // Match by PIN (e.g. 8502 for Julia, 1111 for David)
+  // Check against GUARANTEED_USERS + any successfully synced sheet users
+  const activeUserDatabase = state.users && state.users.length > 0 ? state.users : GUARANTEED_USERS;
+
   if (pinInput) {
-    matchedUser = state.users.find(x => String(x.password).trim() === pinInput);
+    matchedUser = activeUserDatabase.find(x => String(x.password).trim() === pinInput);
   }
 
-  // Match by Username + PIN
   if (!matchedUser && usernameInput && pinInput) {
-    matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === pinInput);
+    matchedUser = activeUserDatabase.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === pinInput);
   }
 
   if (matchedUser) {
@@ -333,16 +329,17 @@ function renderProfiles(type) {
 }
 
 function renderUserManagement(container) {
+  const activeUserDatabase = state.users && state.users.length > 0 ? state.users : GUARANTEED_USERS;
   container.innerHTML = `
     <div class="bg-white dark:bg-slate-900 rounded-2xl border p-4 sm:p-5 shadow-2xs space-y-4">
       <div class="flex justify-between items-center">
-        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced live with Google Sheets (Accounts & Profiles tabs).</p></div>
+        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced live with Google Sheets.</p></div>
         <button onclick="document.getElementById('newUserModal').classList.remove('hidden')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ Create</button>
       </div>
       <table class="w-full text-left text-xs">
         <thead><tr class="border-b text-slate-400"><th class="pb-2">Username</th><th class="pb-2">PIN</th><th class="pb-2">Role</th><th class="pb-2 text-right">Actions</th></tr></thead>
         <tbody class="divide-y">
-          ${state.users.map(u => `
+          ${activeUserDatabase.map(u => `
             <tr>
               <td class="py-3 font-mono font-bold">${u.username}</td>
               <td class="py-3 font-mono">${u.password}</td>
