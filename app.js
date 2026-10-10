@@ -1,6 +1,6 @@
 /**
  * CareTrack Secure - Main Controller
- * PIN-Only Login Enabled (8502 -> Julia [Admin], 1111 -> David [Caregiver], 2222 -> Marcus [Volunteer])
+ * Auto-syncs with 2-Tab Google Sheets Layout & Instant PIN Login
  */
 
 const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
@@ -14,12 +14,10 @@ const HARDCODED_USERS = [
 ];
 
 const DEFAULT_PROFILES = [
-  { id: 'P-1', type: 'client', name: 'Eleanor Vance', pseudonym: 'Client #C-102', membershipTier: '$', membershipMonth: 'Apr 2026', category: 'befriending', isUrgent: true },   { id: 'P-2', type: 'client', name: 'Robert Henderson', pseudonym: 'Client #C-215', membershipTier: '$$', membershipMonth: 'Jan 2026', category: 'caregiver', isUrgent: false },
-  { id: 'P-3', type: 'volunteer', name: 'Marcus Chen', pseudonym: 'Volunteer #V-405', category: 'befriending', isUrgent: false },
-  { id: 'P-4', type: 'volunteer', name: 'Elena Vance', pseudonym: 'Volunteer #V-406', category: 'general', isUrgent: false },
+  { id: 'P-101', type: 'client', name: 'Eleanor Vance', pseudonym: 'Client #C-102', membershipTier: '$', membershipMonth: 'Apr 2026', category: 'befriending', isUrgent: true },   { id: 'P-102', type: 'client', name: 'Robert Henderson', pseudonym: 'Client #C-215', membershipTier: '$$', membershipMonth: 'Jan 2026', category: 'caregiver', isUrgent: false },
+  { id: 'P-201', type: 'volunteer', name: 'Marcus Chen', pseudonym: 'Volunteer #V-405', category: 'befriending', isUrgent: false },
+  { id: 'P-202', type: 'volunteer', name: 'Elena Vance', pseudonym: 'Volunteer #V-406', category: 'general', isUrgent: false },
 ];
-
-const DEFAULT_UPDATES = [];
 
 class AppState {
   constructor() {
@@ -31,14 +29,13 @@ class AppState {
 
     this.users = HARDCODED_USERS;
     this.profiles = DEFAULT_PROFILES;
-    this.updates = JSON.parse(localStorage.getItem('caretrack_updates') || 'null') || DEFAULT_UPDATES;
+    this.updates = JSON.parse(localStorage.getItem('caretrack_updates') || 'null') || [];
     
     this.searchQuery = '';
     this.categoryFilter = 'ALL';
   }
 
   save() {
-    localStorage.setItem('caretrack_users', JSON.stringify(this.users));
     localStorage.setItem('caretrack_dark', this.darkMode);
     localStorage.setItem('caretrack_profiles', JSON.stringify(this.profiles));
     localStorage.setItem('caretrack_updates', JSON.stringify(this.updates));
@@ -88,12 +85,12 @@ async function syncLiveGoogleSheetData() {
 
   try {
     const response = await fetch(CSV_URL);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) throw new Error(`Fetch error: ${response.status}`);
     const csvText = await response.text();
     const rows = parseCSV(csvText);
 
-    const accountsHeaderIdx = rows.findIndex(r => r[0] === 'User ID');
-    const profilesHeaderIdx = rows.findIndex(r => r[0] === 'Profile ID');
+    const accountsHeaderIdx = rows.findIndex(r => r.some(cell => cell.toLowerCase().includes('user id') || cell.toLowerCase().includes('username')));
+    const profilesHeaderIdx = rows.findIndex(r => r.some(cell => cell.toLowerCase().includes('profile id') || cell.toLowerCase().includes('full name')));
 
     if (accountsHeaderIdx !== -1) {
       const parsedUsers = [];
@@ -101,24 +98,20 @@ async function syncLiveGoogleSheetData() {
       
       for (let i = accountsHeaderIdx + 1; i < endIdx; i++) {
         const row = rows[i];
-        if (row.length >= 4 && row[1] && row[2]) {
+        if (row.length >= 3 && row[1] && row[2]) {
           parsedUsers.push({
             id: row[0] || `u-${i}`,
             username: row[1],
             password: String(row[2]).trim(),
-            role: row[3].toLowerCase(),
-            assignedProfile: row[4] || '',
-            membershipTier: row[5] || '',
-            membershipMonth: row[6] || ''
+            role: (row[3] || 'volunteer').toLowerCase()
           });
         }
       }
       if (parsedUsers.length > 0) {
-        // Merge Google Sheet users with hardcoded defaults to ensure Julia (8502) and David (1111) are always present
-        const combinedMap = new Map();
-        HARDCODED_USERS.forEach(u => combinedMap.set(String(u.password).trim(), u));
-        parsedUsers.forEach(u => combinedMap.set(String(u.password).trim(), u));
-        state.users = Array.from(combinedMap.values());
+        const map = new Map();
+        HARDCODED_USERS.forEach(u => map.set(String(u.password).trim(), u));
+        parsedUsers.forEach(u => map.set(String(u.password).trim(), u));
+        state.users = Array.from(map.values());
       }
     }
 
@@ -126,14 +119,14 @@ async function syncLiveGoogleSheetData() {
       const parsedProfiles = [];
       for (let i = profilesHeaderIdx + 1; i < rows.length; i++) {
         const row = rows[i];
-        if (row.length >= 7 && row[2] && row[3]) {
+        if (row.length >= 3 && row[2]) {
           parsedProfiles.push({
             id: row[0] || `p-${i}`,
             type: (row[1] || 'client').toLowerCase(),
             name: row[2],
-            pseudonym: row[3],
+            pseudonym: row[3] || `Client #${i}`,
             membershipTier: row[4] || '$',
-            membershipMonth: row[5] || 'Apr 2026',
+            membershipMonth: (row[5] || 'Apr 2026').replace(/[()]/g, ''),
             category: (row[6] || 'general').toLowerCase(),
             isUrgent: (row[7] || '').toUpperCase() === 'YES'
           });
@@ -147,7 +140,7 @@ async function syncLiveGoogleSheetData() {
     state.save();
     renderApp();
   } catch (error) {
-    console.warn("Using default internal user fallback:", error);
+    console.warn("Using offline internal user data fallback:", error);
   }
 }
 
@@ -163,9 +156,6 @@ function toggleDarkMode() {
   document.documentElement.classList.toggle('dark', state.darkMode);
 }
 
-/**
- * Handles Direct PIN Unlock!
- */
 function handleUserLogin() {
   const pinInput = (document.getElementById('loginPassword')?.value || '').trim();
   const usernameInput = (document.getElementById('loginUsername')?.value || '').trim().toLowerCase();
@@ -175,17 +165,14 @@ function handleUserLogin() {
 
   let matchedUser = null;
 
-  // 1. Direct PIN lookup against all registered passcodes (e.g., 8502 -> Julia, 1111 -> David, 2222 -> Marcus)
   if (pinInput) {
     matchedUser = state.users.find(x => String(x.password).trim() === pinInput);
   }
 
-  // 2. Direct Username + PIN lookup if username provided
   if (!matchedUser && usernameInput && pinInput) {
     matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === pinInput);
   }
 
-  // 3. Admin fallback for PIN 1234
   if (!matchedUser && (pinInput === '1234' || pinInput === '8502')) {
     matchedUser = pinInput === '8502' ? { username: 'Julia', role: 'admin' } : { username: 'admin', role: 'admin' };
   }
@@ -331,11 +318,11 @@ function renderUserManagement(container) {
   container.innerHTML = `
     <div class="bg-white dark:bg-slate-900 rounded-2xl border p-4 sm:p-5 shadow-2xs space-y-4">
       <div class="flex justify-between items-center">
-        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced with Google Drive Master Sheet.</p></div>
+        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced with Google Sheets Master File.</p></div>
         <button onclick="document.getElementById('newUserModal').classList.remove('hidden')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ Create</button>
       </div>
       <table class="w-full text-left text-xs">
-        <thead><tr class="border-b text-slate-400"><th class="pb-2">Username</th><th class="pb-2">PIN / Password</th><th class="pb-2">Role</th><th class="pb-2 text-right">Actions</th></tr></thead>
+        <thead><tr class="border-b text-slate-400"><th class="pb-2">Username</th><th class="pb-2">PIN</th><th class="pb-2">Role</th><th class="pb-2 text-right">Actions</th></tr></thead>
         <tbody class="divide-y">
           ${state.users.map(u => `
             <tr>
