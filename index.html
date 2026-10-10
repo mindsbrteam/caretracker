@@ -19,21 +19,21 @@
     <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 sm:p-8 text-center relative overflow-hidden">
       <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-emerald-500 to-indigo-600"></div>
       <h2 class="text-xl sm:text-2xl font-bold tracking-tight">CareTrack Secure Gate</h2>
-      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 mb-4">Enter your account credentials or master PIN (<code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">1234</code>).</p>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 mb-4">Enter your PIN passcode to unlock (e.g. <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">8502</code> or <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">1111</code>).</p>
 
       <form onsubmit="event.preventDefault(); handleUserLogin();" class="space-y-4 text-left">
         <div>
-          <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Username *</label>
-          <input type="text" id="loginUsername" required placeholder="admin / caregiver / volunteer" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 outline-none" />
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">PIN / Passcode *</label>
+          <input type="password" id="loginPassword" required placeholder="Enter PIN (e.g. 8502 / 1111)" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 outline-none" />
+          <p id="pinError" class="text-xs text-rose-600 font-semibold mt-1 hidden">Invalid PIN or passcode.</p>
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Password / PIN *</label>
-          <input type="password" id="loginPassword" required placeholder="••••" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 outline-none" />
-          <p id="pinError" class="text-xs text-rose-600 font-semibold mt-1 hidden">Invalid credentials.</p>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Username (Optional)</label>
+          <input type="text" id="loginUsername" placeholder="e.g. Julia or caregiver_david" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 outline-none" />
         </div>
-        <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition text-xs">Sign In</button>
+        <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition text-xs">Unlock Workspace</button>
         <div class="pt-2 flex justify-between items-center text-xs text-slate-500">
-          <button type="button" onclick="quickDemoUnlock()" class="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Quick Master Unlock (1234)</button>
+          <button type="button" onclick="quickDemoUnlock()" class="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Quick Unlock (8502)</button>
         </div>
       </form>
     </div>
@@ -42,58 +42,58 @@
   <!-- MAIN APP CONTAINER -->
   <div id="appContainer" class="hidden min-h-screen flex flex-col">
     <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white flex items-center justify-center font-extrabold text-sm">CT</div>
+      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-14 sm:h-16">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">CT</div>
             <div>
-              <div class="flex items-center space-x-2">
-                <span class="font-extrabold text-base tracking-tight">CareTrack</span>
-                <span id="roleBadge" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">Admin</span>
+              <div class="flex items-center space-x-1.5">
+                <span class="font-bold text-sm sm:text-base">CareTrack</span>
+                <span id="roleBadge" class="text-[9px] uppercase font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">Admin</span>
               </div>
             </div>
           </div>
-          <div class="flex items-center space-x-2">
-            <button onclick="exportDataToExcel()" class="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-bold">📊 Export Excel</button>
+          <div class="flex items-center space-x-1.5">
+            <button onclick="exportDataToExcel()" class="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-bold">📊 Export</button>
             <button onclick="toggleDarkMode()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs">🌙</button>
             <button onclick="lockApplication()" class="p-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-xs font-semibold">🔒</button>
           </div>
         </div>
 
-        <div id="navTabsContainer" class="flex space-x-4 border-t border-slate-100 dark:border-slate-800 overflow-x-auto">
-          <button id="tabBtnClients" onclick="switchTab('clients')" class="py-3 px-3 font-bold text-xs border-b-2 border-indigo-600 text-indigo-600">Client Profiles</button>
-          <button id="tabBtnVolunteers" onclick="switchTab('volunteers')" class="py-3 px-3 font-semibold text-xs border-b-2 border-transparent text-slate-500">Volunteer Profiles</button>
-          <button id="tabBtnUsers" onclick="switchTab('users')" class="py-3 px-3 font-semibold text-xs border-b-2 border-transparent text-slate-500">User Accounts Management</button>
+        <div id="navTabsContainer" class="flex space-x-3 border-t border-slate-100 dark:border-slate-800 overflow-x-auto">
+          <button id="tabBtnClients" onclick="switchTab('clients')" class="py-2.5 px-2 font-bold text-xs border-b-2 border-indigo-600 text-indigo-600">Client Profiles</button>
+          <button id="tabBtnVolunteers" onclick="switchTab('volunteers')" class="py-2.5 px-2 font-semibold text-xs border-b-2 border-transparent text-slate-500">Volunteer Profiles</button>
+          <button id="tabBtnUsers" onclick="switchTab('users')" class="py-2.5 px-2 font-semibold text-xs border-b-2 border-transparent text-slate-500">User Accounts</button>
         </div>
       </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
-      <div id="statsBanner" class="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
-          <p class="text-xs text-slate-500">Active Profiles</p>
-          <p id="statTotalProfiles" class="text-xl font-bold mt-1">0</p>
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full space-y-4 sm:space-y-6">
+      <div id="statsBanner" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-[11px] text-slate-500">Active Profiles</p>
+          <p id="statTotalProfiles" class="text-lg sm:text-xl font-bold mt-0.5">0</p>
         </div>
-        <div id="statUrgentBox" class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
-          <p class="text-xs text-rose-600">Urgent Priority</p>
-          <p id="statUrgentCount" class="text-xl font-bold text-rose-700 mt-1">0</p>
+        <div id="statUrgentBox" class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <p class="text-[11px] text-rose-600">Urgent Priority</p>
+          <p id="statUrgentCount" class="text-lg sm:text-xl font-bold text-rose-700 mt-0.5">0</p>
         </div>
-        <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 col-span-2 md:col-span-1">
-          <p class="text-xs text-slate-500">Total Updates Logged</p>
-          <p id="statTotalUpdates" class="text-xl font-bold mt-1">0</p>
+        <div class="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 col-span-2 md:col-span-1">
+          <p class="text-[11px] text-slate-500">Total Updates</p>
+          <p id="statTotalUpdates" class="text-lg sm:text-xl font-bold mt-0.5">0</p>
         </div>
       </div>
 
-      <div id="searchFilterBar" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <h1 id="mainHeaderTitle" class="text-lg font-bold">Profiles & Tracking</h1>
+      <div id="searchFilterBar" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <h1 id="mainHeaderTitle" class="text-base sm:text-lg font-bold">Profiles & Tracking</h1>
           <div class="flex items-center gap-2">
-            <button onclick="openNewProfileModal()" id="createProfileBtn" class="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ New Profile</button>
-            <button onclick="openNewUpdateModal()" class="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">+ Log Update</button>
+            <button onclick="openNewProfileModal()" id="createProfileBtn" class="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ New Profile</button>
+            <button onclick="openNewUpdateModal()" class="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold">+ Log Update</button>
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t text-xs">
-          <input type="text" id="globalSearch" placeholder="Search records..." class="sm:col-span-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl outline-none" />
+          <input type="text" id="globalSearch" placeholder="Search records..." class="sm:col-span-2 px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl outline-none" />
           <select id="categoryFilterSelect" class="px-3 py-2 bg-slate-50 dark:bg-slate-800 border rounded-xl outline-none">
             <option value="ALL">All Categories</option>
             <option value="befriending">befriending</option>
@@ -108,50 +108,50 @@
         </div>
       </div>
 
-      <div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+      <div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
       <div id="usersManagementSection" class="hidden space-y-4"></div>
     </main>
   </div>
 
   <!-- MODALS -->
-  <div id="newProfileModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
-    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border shadow-2xl text-xs space-y-3">
+  <div id="newProfileModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-3 hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-5 sm:p-6 border shadow-2xl text-xs space-y-3">
       <div class="flex justify-between items-center pb-2 border-b"><h3 class="font-bold">Create Profile</h3><button onclick="closeModals()" class="text-lg font-bold">&times;</button></div>
       <form onsubmit="saveNewProfile(event)" class="space-y-3">
         <div><label class="block font-bold mb-1">Type</label><select id="np_type" onchange="toggleProfileFields()" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="client">Client</option><option value="volunteer">Volunteer</option></select></div>
         <div><label class="block font-bold mb-1">Full Name</label><input type="text" id="np_name" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
-        <div id="clientMembershipDiv"><label class="block font-bold mb-1">Membership Tier ($ emoji) & Month</label><div class="grid grid-cols-2 gap-2"><select id="np_membershipTier" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800 font-mono"><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option></select><input type="text" id="np_membershipMonth" placeholder="Apr 2026" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div></div>
+        <div id="clientMembershipDiv"><label class="block font-bold mb-1">Membership Tier & Month</label><div class="grid grid-cols-2 gap-2"><select id="np_membershipTier" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800 font-mono"><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option></select><input type="text" id="np_membershipMonth" placeholder="Apr 2026" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div></div>
         <div><label class="block font-bold mb-1">Category</label><select id="np_category" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="befriending">befriending</option><option value="behaviour support">behaviour support</option><option value="preferences">preferences</option><option value="achievement">achievement</option><option value="general">general</option><option value="requests">requests</option><option value="caregiver">caregiver</option><option value="FEM">FEM</option></select></div>
         <div class="flex items-center space-x-2"><input type="checkbox" id="np_isUrgent" class="w-4 h-4 text-rose-600 rounded" /><label for="np_isUrgent" class="font-bold text-rose-700">Urgent Case</label></div>
-        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-4 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl">Save</button></div>
+        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-indigo-600 text-white font-bold rounded-xl">Save</button></div>
       </form>
     </div>
   </div>
 
-  <div id="newUpdateModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
-    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border shadow-2xl text-xs space-y-3">
+  <div id="newUpdateModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-3 hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-5 sm:p-6 border shadow-2xl text-xs space-y-3">
       <div class="flex justify-between items-center pb-2 border-b"><h3 class="font-bold">Log Case Update</h3><button onclick="closeModals()" class="text-lg font-bold">&times;</button></div>
       <form onsubmit="saveNewUpdate(event)" class="space-y-3">
         <div><label class="block font-bold mb-1">Target Profile Type</label><select id="nu_targetType" onchange="updateUpdateProfileAutofillList()" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="client">Client</option><option value="volunteer">Volunteer</option></select></div>
-        <div><label class="block font-bold mb-1">Profile Autofill Search</label><input type="text" id="nu_profileSearchInput" list="profileAutofillList" required placeholder="Type e.g. E for Eleanor..." class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /><datalist id="profileAutofillList"></datalist></div>
+        <div><label class="block font-bold mb-1">Profile Autofill Search (Type e.g. E or M)</label><input type="text" id="nu_profileSearchInput" list="profileAutofillList" required placeholder="Type name..." class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /><datalist id="profileAutofillList"></datalist></div>
         <div class="grid grid-cols-2 gap-2">
           <div><label class="block font-bold mb-1">Date</label><input type="date" id="nu_date" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
           <div><label class="block font-bold mb-1">Category</label><select id="nu_category" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="befriending">befriending</option><option value="behaviour support">behaviour support</option><option value="preferences">preferences</option><option value="achievement">achievement</option><option value="general">general</option><option value="requests">requests</option><option value="caregiver">caregiver</option><option value="FEM">FEM</option></select></div>
         </div>
-        <div><label class="block font-bold mb-1">Notes</label><textarea id="nu_notes" rows="4" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"></textarea></div>
-        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-4 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-xl">Save</button></div>
+        <div><label class="block font-bold mb-1">Notes</label><textarea id="nu_notes" rows="3" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"></textarea></div>
+        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-emerald-600 text-white font-bold rounded-xl">Save</button></div>
       </form>
     </div>
   </div>
 
-  <div id="newUserModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 hidden">
-    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 border shadow-2xl text-xs space-y-3">
+  <div id="newUserModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-3 hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-5 sm:p-6 border shadow-2xl text-xs space-y-3">
       <div class="flex justify-between items-center pb-2 border-b"><h3 class="font-bold">Create User Account</h3><button onclick="closeModals()" class="text-lg font-bold">&times;</button></div>
       <form onsubmit="saveNewUser(event)" class="space-y-3">
         <div><label class="block font-bold mb-1">Username</label><input type="text" id="nu_username" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
-        <div><label class="block font-bold mb-1">Password</label><input type="password" id="nu_password" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
+        <div><label class="block font-bold mb-1">Password / PIN</label><input type="password" id="nu_password" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
         <div><label class="block font-bold mb-1">Role</label><select id="nu_role" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="admin">Staff Admin</option><option value="caregiver">Caregiver</option><option value="volunteer">Volunteer</option></select></div>
-        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-4 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl">Create</button></div>
+        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-indigo-600 text-white font-bold rounded-xl">Create</button></div>
       </form>
     </div>
   </div>
