@@ -166,10 +166,14 @@ function toggleDarkMode() {
   document.documentElement.classList.toggle('dark', state.darkMode);
 }
 
+/**
+ * Case-insensitive & trimmed login verification
+ */
 function handleUserLogin() {
-  const u = document.getElementById('loginUsername').value.trim();
+  const u = document.getElementById('loginUsername').value.trim().toLowerCase();
   const p = document.getElementById('loginPassword').value.trim();
-  const found = state.users.find(x => x.username === u && x.password === p);
+  
+  const found = state.users.find(x => x.username.trim().toLowerCase() === u && String(x.password).trim() === p);
 
   if (found || (u === 'admin' && p === '1234')) {
     state.isAuthenticated = true;
@@ -186,8 +190,8 @@ function handleUserLogin() {
 }
 
 function quickDemoUnlock() {
-  document.getElementById('loginUsername').value = 'admin';
-  document.getElementById('loginPassword').value = '1234';
+  document.getElementById('loginUsername').value = 'Julia';
+  document.getElementById('loginPassword').value = '8502';
   handleUserLogin();
 }
 
@@ -324,7 +328,7 @@ function renderUserManagement(container) {
               <td class="py-3 font-mono font-bold">${u.username}</td>
               <td class="py-3 font-mono">${u.password}</td>
               <td class="py-3 uppercase text-[10px] font-bold"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">${u.role}</span></td>
-              <td class="py-3 text-right">${u.username !== 'admin' ? `<button onclick="deleteUser('${u.id}')" class="text-rose-600 font-semibold hover:underline">Delete</button>` : '<span class="text-slate-400">Locked</span>'}</td>
+              <td class="py-3 text-right">${u.username !== 'admin' && u.username.toLowerCase() !== 'julia' ? `<button onclick="deleteUser('${u.id}')" class="text-rose-600 font-semibold hover:underline">Delete</button>` : '<span class="text-slate-400">Locked</span>'}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -409,7 +413,7 @@ function saveNewProfile(e) {
   });
   state.save();
   closeModals();
-  document.getElementById('newProfileForm').reset();
+  document.getElementById('np_name').value = '';
   renderApp();
 }
 
@@ -434,7 +438,7 @@ function saveNewUpdate(e) {
   });
   state.save();
   closeModals();
-  document.getElementById('newUpdateForm').reset();
+  document.getElementById('nu_notes').value = '';
   renderApp();
 }
 
