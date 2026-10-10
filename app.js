@@ -1,6 +1,6 @@
 /**
  * CareTrack Secure - Main Controller
- * Integrated with Live Google Sheets multi-tab CSV parser & auto-sync.
+ * Supports direct PIN unlock (8502 -> Julia) & Username/Password login.
  */
 
 const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
@@ -54,16 +54,13 @@ function canSeeCategory(category, role) {
   return role === 'volunteer' || role === 'caregiver';
 }
 
-/**
- * Robust CSV Line Splitter / Parser
- */
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   const result = [];
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    if (!line || line.startsWith('#')) continue; // Skip comments/sheet headers
+    if (!line || line.startsWith('#')) continue;
     
     const row = [];
     let inQuotes = false;
@@ -86,9 +83,6 @@ function parseCSV(text) {
   return result;
 }
 
-/**
- * Real-time Sync from Google Sheets
- */
 async function syncLiveGoogleSheetData() {
   const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
 
@@ -121,6 +115,7 @@ async function syncLiveGoogleSheetData() {
       }
       if (parsedUsers.length > 0) {
         state.users = parsedUsers;
+        localStorage.setItem('caretrack_users', JSON.stringify(parsedUsers));
       }
     }
 
@@ -143,14 +138,14 @@ async function syncLiveGoogleSheetData() {
       }
       if (parsedProfiles.length > 0) {
         state.profiles = parsedProfiles;
+        localStorage.setItem('caretrack_profiles', JSON.stringify(parsedProfiles));
       }
     }
 
     state.save();
     renderApp();
-    console.log("Successfully synced live accounts and profiles from Google Sheet!");
   } catch (error) {
-    console.warn("Using cached/local storage data fallback:", error);
+    console.warn("Using cached data fallback:", error);
   }
 }
 
@@ -167,30 +162,45 @@ function toggleDarkMode() {
 }
 
 /**
- * Case-insensitive & trimmed login verification
+ * Handles PIN-only or Username + PIN unlock!
  */
 function handleUserLogin() {
-  const u = document.getElementById('loginUsername').value.trim().toLowerCase();
-  const p = document.getElementById('loginPassword').value.trim();
-  
-  const found = state.users.find(x => x.username.trim().toLowerCase() === u && String(x.password).trim() === p);
+  const usernameInput = (document.getElementById('loginUsername')?.value || '').trim().toLowerCase();
+  const passwordInput = (document.getElementById('loginPassword')?.value || '').trim();
+  const errorEl = document.getElementById('pinError');
 
-  if (found || (u === 'admin' && p === '1234')) {
+  let matchedUser = null;
+
+  // 1. Check if entering PIN directly matching any user's password (e.g. 8502 -> Julia)
+  if (passwordInput) {
+    matchedUser = state.users.find(x => String(x.password).trim() === passwordInput);
+  }
+
+  // 2. Check Username + Password match if username was typed
+  if (!matchedUser && usernameInput && passwordInput) {
+    matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === passwordInput);
+  }
+
+  // 3. Fallback for master PIN 1234
+  if (!matchedUser && (passwordInput === '1234' || (usernameInput === 'admin' && passwordInput === '1234'))) {
+    matchedUser = { username: 'admin', role: 'admin' };
+  }
+
+  if (matchedUser) {
     state.isAuthenticated = true;
-    state.currentUser = found ? found.username : 'admin';
-    state.role = found ? found.role : 'admin';
+    state.currentUser = matchedUser.username;
+    state.role = matchedUser.role;
     state.save();
     document.getElementById('authGate').classList.add('hidden');
     document.getElementById('appContainer').classList.remove('hidden');
     enforceRoleAccessRules();
     renderApp();
   } else {
-    document.getElementById('pinError').classList.remove('hidden');
+    if (errorEl) errorEl.classList.remove('hidden');
   }
 }
 
 function quickDemoUnlock() {
-  document.getElementById('loginUsername').value = 'Julia';
   document.getElementById('loginPassword').value = '8502';
   handleUserLogin();
 }
@@ -321,7 +331,7 @@ function renderUserManagement(container) {
         <button onclick="document.getElementById('newUserModal').classList.remove('hidden')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ Create</button>
       </div>
       <table class="w-full text-left text-xs">
-        <thead><tr class="border-b text-slate-400"><th class="pb-2">Username</th><th class="pb-2">Password</th><th class="pb-2">Role</th><th class="pb-2 text-right">Actions</th></tr></thead>
+        <thead><tr class="border-b text-slate-400"><th class="pb-2">Username</th><th class="pb-2">PIN / Password</th><th class="pb-2">Role</th><th class="pb-2 text-right">Actions</th></tr></thead>
         <tbody class="divide-y">
           ${state.users.map(u => `
             <tr>
