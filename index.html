@@ -8,34 +8,43 @@
   <script>
     tailwind.config = { darkMode: 'class', theme: { extend: {} } }
   </script>
-  <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col antialiased transition-colors duration-200">
 
   <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-auto"></div>
 
-  <!-- AUTH GATE -->
+  <!-- AUTH GATE (PHONE KEYPAD LAYOUT) -->
   <div id="authGate" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 sm:p-8 text-center relative overflow-hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 sm:p-8 text-center relative overflow-hidden">
       <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 via-emerald-500 to-indigo-600"></div>
-      <h2 class="text-xl sm:text-2xl font-bold tracking-tight">CareTrack Secure Gate</h2>
-      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 mb-4">Enter your PIN passcode to unlock (e.g. <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">8502</code> or <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">1111</code>).</p>
+      
+      <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-indigo-50 dark:bg-slate-800 text-indigo-600 flex items-center justify-center font-bold text-lg">🔒</div>
+      <h2 class="text-xl font-bold tracking-tight">CareTrack Security Gate</h2>
+      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-6">Enter PIN passcode to unlock workspace (e.g., <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">8502</code> or <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">1111</code>)</p>
 
-      <form onsubmit="event.preventDefault(); handleUserLogin();" class="space-y-4 text-left">
-        <div>
-          <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">PIN / Passcode *</label>
-          <input type="password" id="loginPassword" required placeholder="Enter PIN (e.g. 8502 / 1111)" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 outline-none" />
-          <p id="pinError" class="text-xs text-rose-600 font-semibold mt-1 hidden">Invalid PIN or passcode.</p>
-        </div>
-        <div>
-          <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Username (Optional)</label>
-          <input type="text" id="loginUsername" placeholder="e.g. Julia or caregiver_david" class="w-full text-xs px-3.5 py-2.5 border border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 outline-none" />
-        </div>
-        <button type="submit" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition text-xs">Unlock Workspace</button>
-        <div class="pt-2 flex justify-between items-center text-xs text-slate-500">
-          <button type="button" onclick="quickDemoUnlock()" class="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Quick Unlock (8502)</button>
-        </div>
-      </form>
+      <!-- PIN Display Screen -->
+      <div class="mb-6">
+        <input type="password" id="loginPassword" readonly placeholder="••••" class="w-full text-center tracking-widest text-2xl font-mono px-4 py-3 border border-slate-300 dark:border-slate-700 rounded-2xl bg-slate-50 dark:bg-slate-800 outline-none select-none pointer-events-none" />
+        <p id="pinError" class="text-xs text-rose-600 font-semibold mt-2 hidden">Incorrect PIN. Please re-enter.</p>
+      </div>
+
+      <!-- Keypad Grid -->
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <button type="button" onclick="appendPin('1')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">1</button>
+        <button type="button" onclick="appendPin('2')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">2</button>
+        <button type="button" onclick="appendPin('3')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">3</button>
+        <button type="button" onclick="appendPin('4')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">4</button>
+        <button type="button" onclick="appendPin('5')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">5</button>
+        <button type="button" onclick="appendPin('6')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">6</button>
+        <button type="button" onclick="appendPin('7')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">7</button>
+        <button type="button" onclick="appendPin('8')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">8</button>
+        <button type="button" onclick="appendPin('9')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">9</button>
+        <button type="button" onclick="clearPin()" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 rounded-2xl font-bold text-xs transition text-slate-500">C</button>
+        <button type="button" onclick="appendPin('0')" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-lg transition">0</button>
+        <button type="button" onclick="backspacePin()" class="py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl font-bold text-sm transition text-slate-500">⌫</button>
+      </div>
+
+      <button type="button" onclick="handleUserLogin()" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition text-xs">Unlock Workspace</button>
     </div>
   </div>
 
@@ -54,6 +63,7 @@
             </div>
           </div>
           <div class="flex items-center space-x-1.5">
+            <button id="anonymizeToggleBtn" onclick="toggleAnonymizeMode()" class="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-[11px] font-bold">🕵️ Anonymize: OFF</button>
             <button onclick="exportDataToExcel()" class="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-[11px] font-bold">📊 Export</button>
             <button onclick="toggleDarkMode()" class="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs">🌙</button>
             <button onclick="lockApplication()" class="p-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 text-xs font-semibold">🔒</button>
@@ -63,6 +73,7 @@
         <div id="navTabsContainer" class="flex space-x-3 border-t border-slate-100 dark:border-slate-800 overflow-x-auto">
           <button id="tabBtnClients" onclick="switchTab('clients')" class="py-2.5 px-2 font-bold text-xs border-b-2 border-indigo-600 text-indigo-600">Client Profiles</button>
           <button id="tabBtnVolunteers" onclick="switchTab('volunteers')" class="py-2.5 px-2 font-semibold text-xs border-b-2 border-transparent text-slate-500">Volunteer Profiles</button>
+          <button id="tabBtnSchemes" onclick="switchTab('schemes')" class="py-2.5 px-2 font-semibold text-xs border-b-2 border-transparent text-slate-500">🇸🇬 Singapore Care Schemes</button>
           <button id="tabBtnUsers" onclick="switchTab('users')" class="py-2.5 px-2 font-semibold text-xs border-b-2 border-transparent text-slate-500">User Accounts</button>
         </div>
       </div>
@@ -109,6 +120,7 @@
       </div>
 
       <div id="profilesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      <div id="schemesDirectorySection" class="hidden space-y-4"></div>
       <div id="usersManagementSection" class="hidden space-y-4"></div>
     </main>
   </div>
@@ -118,9 +130,9 @@
     <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-5 sm:p-6 border shadow-2xl text-xs space-y-3">
       <div class="flex justify-between items-center pb-2 border-b"><h3 class="font-bold">Create Profile</h3><button onclick="closeModals()" class="text-lg font-bold">&times;</button></div>
       <form onsubmit="saveNewProfile(event)" class="space-y-3">
-        <div><label class="block font-bold mb-1">Type</label><select id="np_type" onchange="toggleProfileFields()" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="client">Client</option><option value="volunteer">Volunteer</option></select></div>
+        <div><label class="block font-bold mb-1">Type</label><select id="np_type" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="client">Client</option><option value="volunteer">Volunteer</option></select></div>
         <div><label class="block font-bold mb-1">Full Name</label><input type="text" id="np_name" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
-        <div id="clientMembershipDiv"><label class="block font-bold mb-1">Membership Tier & Month</label><div class="grid grid-cols-2 gap-2"><select id="np_membershipTier" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800 font-mono"><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option></select><input type="text" id="np_membershipMonth" placeholder="Apr 2026" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div></div>
+        <div><label class="block font-bold mb-1">Membership Tier & Month</label><div class="grid grid-cols-2 gap-2"><select id="np_membershipTier" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800 font-mono"><option value="$">$</option><option value="$$">$$</option><option value="$$$">$$$</option></select><input type="text" id="np_membershipMonth" placeholder="Apr 2026" class="p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div></div>
         <div><label class="block font-bold mb-1">Category</label><select id="np_category" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="befriending">befriending</option><option value="behaviour support">behaviour support</option><option value="preferences">preferences</option><option value="achievement">achievement</option><option value="general">general</option><option value="requests">requests</option><option value="caregiver">caregiver</option><option value="FEM">FEM</option></select></div>
         <div class="flex items-center space-x-2"><input type="checkbox" id="np_isUrgent" class="w-4 h-4 text-rose-600 rounded" /><label for="np_isUrgent" class="font-bold text-rose-700">Urgent Case</label></div>
         <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-indigo-600 text-white font-bold rounded-xl">Save</button></div>
@@ -133,26 +145,35 @@
       <div class="flex justify-between items-center pb-2 border-b"><h3 class="font-bold">Log Case Update</h3><button onclick="closeModals()" class="text-lg font-bold">&times;</button></div>
       <form onsubmit="saveNewUpdate(event)" class="space-y-3">
         <div><label class="block font-bold mb-1">Target Profile Type</label><select id="nu_targetType" onchange="updateUpdateProfileAutofillList()" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="client">Client</option><option value="volunteer">Volunteer</option></select></div>
-        <div><label class="block font-bold mb-1">Profile Autofill Search (Type e.g. E or M)</label><input type="text" id="nu_profileSearchInput" list="profileAutofillList" required placeholder="Type name..." class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /><datalist id="profileAutofillList"></datalist></div>
+        <div><label class="block font-bold mb-1">Profile Search</label><input type="text" id="nu_profileSearchInput" list="profileAutofillList" required placeholder="Type name..." class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /><datalist id="profileAutofillList"></datalist></div>
         <div class="grid grid-cols-2 gap-2">
           <div><label class="block font-bold mb-1">Date</label><input type="date" id="nu_date" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
           <div><label class="block font-bold mb-1">Category</label><select id="nu_category" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="befriending">befriending</option><option value="behaviour support">behaviour support</option><option value="preferences">preferences</option><option value="achievement">achievement</option><option value="general">general</option><option value="requests">requests</option><option value="caregiver">caregiver</option><option value="FEM">FEM</option></select></div>
         </div>
-        <div><label class="block font-bold mb-1">Notes</label><textarea id="nu_notes" rows="3" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"></textarea></div>
-        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-emerald-600 text-white font-bold rounded-xl">Save</button></div>
+        
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="font-bold">Case Notes (Type @ to mention staff)</label>
+            <div class="flex space-x-1.5">
+              <button type="button" onclick="toggleDictation()" id="dictationBtn" class="px-2 py-0.5 bg-rose-50 text-rose-700 rounded-lg text-[10px] font-bold">🎙️ Record</button>
+              <button type="button" onclick="aiPointFormNote()" class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold">⚡ Format to Point Form (AI)</button>
+            </div>
+          </div>
+          <textarea id="nu_notes" rows="4" required placeholder="Observations, interventions, updates..." class="w-full p-2.5 border rounded-xl bg-slate-50 dark:bg-slate-800"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-emerald-600 text-white font-bold rounded-xl">Save & Dispatch Handover</button></div>
       </form>
     </div>
   </div>
 
-  <div id="newUserModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-3 hidden">
-    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-5 sm:p-6 border shadow-2xl text-xs space-y-3">
-      <div class="flex justify-between items-center pb-2 border-b"><h3 class="font-bold">Create User Account</h3><button onclick="closeModals()" class="text-lg font-bold">&times;</button></div>
-      <form onsubmit="saveNewUser(event)" class="space-y-3">
-        <div><label class="block font-bold mb-1">Username</label><input type="text" id="nu_username" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
-        <div><label class="block font-bold mb-1">Password / PIN</label><input type="password" id="nu_password" required class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800" /></div>
-        <div><label class="block font-bold mb-1">Role</label><select id="nu_role" class="w-full p-2 border rounded-xl bg-slate-50 dark:bg-slate-800"><option value="admin">Staff Admin</option><option value="caregiver">Caregiver</option><option value="volunteer">Volunteer</option></select></div>
-        <div class="flex justify-end space-x-2 pt-2 border-t"><button type="button" onclick="closeModals()" class="px-3.5 py-2 border rounded-xl">Cancel</button><button type="submit" class="px-3.5 py-2 bg-indigo-600 text-white font-bold rounded-xl">Create</button></div>
-      </form>
+  <div id="aiSummaryModal" class="modal-window fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-3 hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-5 sm:p-6 border shadow-2xl text-xs space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center pb-2 border-b">
+        <h3 id="aiModalTitle" class="font-bold text-sm text-indigo-600">🤖 Gemini AI Synthesis & SG Schemes Evaluation</h3>
+        <button onclick="closeModals()" class="text-lg font-bold">&times;</button>
+      </div>
+      <div id="aiModalContent" class="space-y-3"></div>
     </div>
   </div>
 
