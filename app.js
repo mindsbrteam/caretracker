@@ -1,11 +1,13 @@
 /**
- * CareTrack Secure - Main Controller
- * Auto-syncs with 2-Tab Google Sheets Layout & Instant PIN Login
+ * CareTrack Secure - Live Google Sheets Multi-Tab Sync Controller
  */
 
 const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
+// Your Google Sheet Tabs: Accounts and Profiles have unique GIDs
+const ACCOUNTS_GID = "0"; // Default first tab (Accounts)
+const PROFILES_GID = "266849651"; // Profiles tab GID from your URL
 
-const HARDCODED_USERS = [
+const FALLBACK_USERS = [
   { id: 'U-001', username: 'admin', password: '1234', role: 'admin' },
   { id: 'U-002', username: 'Julia', password: '8502', role: 'admin' },
   { id: 'U-003', username: 'caregiver_david', password: '1111', role: 'caregiver' },
@@ -27,8 +29,8 @@ class AppState {
     this.darkMode = localStorage.getItem('caretrack_dark') === 'true';
     this.activeTab = 'clients';
 
-    this.users = HARDCODED_USERS;
-    this.profiles = DEFAULT_PROFILES;
+    this.users = JSON.parse(localStorage.getItem('caretrack_users') || 'null') || FALLBACK_USERS;
+    this.profiles = JSON.parse(localStorage.getItem('caretrack_profiles') || 'null') || DEFAULT_PROFILES;
     this.updates = JSON.parse(localStorage.getItem('caretrack_updates') || 'null') || [];
     
     this.searchQuery = '';
@@ -36,6 +38,7 @@ class AppState {
   }
 
   save() {
+    localStorage.setItem('caretrack_users', JSON.stringify(this.users));
     localStorage.setItem('caretrack_dark', this.darkMode);
     localStorage.setItem('caretrack_profiles', JSON.stringify(this.profiles));
     localStorage.setItem('caretrack_updates', JSON.stringify(this.updates));
@@ -80,74 +83,91 @@ function parseCSV(text) {
   return result;
 }
 
-async function syncLiveGoogleSheetData() {
-  const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+/**
+ * Syncs both tabs (Accounts & Profiles) in parallel from Google Sheets
+ */
+async function syncLiveGoogleSheets() {
+  const accountsUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${ACCOUNTS_GID}`;
+  const profilesUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${PROFILES_GID}`;
 
   try {
-    const response = await fetch(CSV_URL);
-    if (!response.ok) throw new Error(`Fetch error: ${response.status}`);
-    const csvText = await response.text();
-    const rows = parseCSV(csvText);
+    const [accRes, profRes] = await Promise.all([
+      fetch(accountsUrl).catch(() => null),
+      fetch(profilesUrl).catch(() => null)
+    ]);
 
-    const accountsHeaderIdx = rows.findIndex(r => r.some(cell => cell.toLowerCase().includes('user id') || cell.toLowerCase().includes('username')));
-    const profilesHeaderIdx = rows.findIndex(r => r.some(cell => cell.toLowerCase().includes('profile id') || cell.toLowerCase().includes('full name')));
-
-    if (accountsHeaderIdx !== -1) {
+    // 1. Parse Accounts Tab
+    if (accRes && accRes.ok) {
+      const csvText = await accRes.text();
+      const rows = parseCSV(csvText);
       const parsedUsers = [];
-      const endIdx = profilesHeaderIdx !== -1 ? profilesHeaderIdx : rows.length;
-      
-      for (let i = accountsHeaderIdx + 1; i < endIdx; i++) {
+
+      // Skip header row (index 0)
+      for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (row.length >= 3 && row[1] && row[2]) {
+        // Columns: User ID (0), Username (1), PIN (2), Role (3)
+        if (row.length >= 4 && row[1] && row[2]) {
           parsedUsers.push({
             id: row[0] || `u-${i}`,
             username: row[1],
             password: String(row[2]).trim(),
-            role: (row[3] || 'volunteer').toLowerCase()
+            role: String(row[3]).trim().toLowerCase()
           });
         }
       }
+
       if (parsedUsers.length > 0) {
+        // Merge with fallback to guarantee Julia (8502) and David (1111) are always present
         const map = new Map();
-        HARDCODED_USERS.forEach(u => map.set(String(u.password).trim(), u));
+        FALLBACK_USERS.forEach(u => map.set(String(u.password).trim(), u));
         parsedUsers.forEach(u => map.set(String(u.password).trim(), u));
         state.users = Array.from(map.values());
+        localStorage.setItem('caretrack_users', JSON.stringify(state.users));
       }
     }
 
-    if (profilesHeaderIdx !== -1) {
+    // 2. Parse Profiles Tab
+    if (profRes && profRes.ok) {
+      const csvText = await profRes.text();
+      const rows = parseCSV(csvText);
       const parsedProfiles = [];
-      for (let i = profilesHeaderIdx + 1; i < rows.length; i++) {
+
+      // Skip header row (index 0)
+      for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
+        // Columns: Profile ID (0), Profile Type (1), Full Name (2), Pseudonym (3), Membership Tier (4), Membership Month (5), Primary Category (6), Urgent Case (7)
         if (row.length >= 3 && row[2]) {
           parsedProfiles.push({
             id: row[0] || `p-${i}`,
-            type: (row[1] || 'client').toLowerCase(),
+            type: String(row[1] || 'client').trim().toLowerCase(),
             name: row[2],
             pseudonym: row[3] || `Client #${i}`,
             membershipTier: row[4] || '$',
             membershipMonth: (row[5] || 'Apr 2026').replace(/[()]/g, ''),
-            category: (row[6] || 'general').toLowerCase(),
-            isUrgent: (row[7] || '').toUpperCase() === 'YES'
+            category: String(row[6] || 'general').trim().toLowerCase(),
+            isUrgent: String(row[7] || '').trim().toUpperCase() === 'YES'
           });
         }
       }
+
       if (parsedProfiles.length > 0) {
         state.profiles = parsedProfiles;
+        localStorage.setItem('caretrack_profiles', JSON.stringify(state.profiles));
       }
     }
 
     state.save();
     renderApp();
+    console.log("Successfully synced both tabs from Google Sheets!");
   } catch (error) {
-    console.warn("Using offline internal user data fallback:", error);
+    console.warn("Using offline fallback storage:", error);
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   if (state.darkMode) document.documentElement.classList.add('dark');
   setupEventListeners();
-  syncLiveGoogleSheetData();
+  syncLiveGoogleSheets();
 });
 
 function toggleDarkMode() {
@@ -165,16 +185,14 @@ function handleUserLogin() {
 
   let matchedUser = null;
 
+  // Match by PIN (e.g. 8502 for Julia, 1111 for David)
   if (pinInput) {
     matchedUser = state.users.find(x => String(x.password).trim() === pinInput);
   }
 
+  // Match by Username + PIN
   if (!matchedUser && usernameInput && pinInput) {
     matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === pinInput);
-  }
-
-  if (!matchedUser && (pinInput === '1234' || pinInput === '8502')) {
-    matchedUser = pinInput === '8502' ? { username: 'Julia', role: 'admin' } : { username: 'admin', role: 'admin' };
   }
 
   if (matchedUser) {
@@ -318,7 +336,7 @@ function renderUserManagement(container) {
   container.innerHTML = `
     <div class="bg-white dark:bg-slate-900 rounded-2xl border p-4 sm:p-5 shadow-2xs space-y-4">
       <div class="flex justify-between items-center">
-        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced with Google Sheets Master File.</p></div>
+        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced live with Google Sheets (Accounts & Profiles tabs).</p></div>
         <button onclick="document.getElementById('newUserModal').classList.remove('hidden')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ Create</button>
       </div>
       <table class="w-full text-left text-xs">
