@@ -1,20 +1,22 @@
 /**
  * CareTrack Secure - Main Controller
- * Integrated with Live Google Sheets multi-tab auto-sync.
+ * Integrated with Live Google Sheets multi-tab CSV parser & auto-sync.
  */
 
-// Your Google Sheet URL: https://docs.google.com/spreadsheets/d/1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo/edit?usp=drive_link
-const SHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
+const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
 
 const DEFAULT_USERS = [
-  { id: 'u-1', username: 'admin', password: '1234', role: 'admin' },
-  { id: 'u-2', username: 'caregiver', password: 'password', role: 'caregiver' },
-  { id: 'u-3', username: 'volunteer', password: 'password', role: 'volunteer' },
+  { id: 'U-001', username: 'admin', password: '1234', role: 'admin' },
+  { id: 'U-002', username: 'Julia', password: '8502', role: 'admin' },
+  { id: 'U-003', username: 'caregiver_david', password: '1111', role: 'caregiver' },
+  { id: 'U-004', username: 'volunteer_marcus', password: '2222', role: 'volunteer' },
+  { id: 'U-005', username: 'volunteer_elena', password: '3333', role: 'volunteer' },
 ];
 
 const DEFAULT_PROFILES = [
-  { id: 'p-1', type: 'client', name: 'Eleanor Vance', pseudonym: 'Client #C-102', membershipTier: '$', membershipMonth: 'Apr 2026', category: 'befriending', isUrgent: true },
-  { id: 'p-2', type: 'volunteer', name: 'Marcus Chen', pseudonym: 'Volunteer #V-405', category: 'befriending', isUrgent: false },
+  { id: 'P-1', type: 'client', name: 'Eleanor Vance', pseudonym: 'Client #C-102', membershipTier: '$', membershipMonth: 'Apr 2026', category: 'befriending', isUrgent: true },   { id: 'P-2', type: 'client', name: 'Robert Henderson', pseudonym: 'Client #C-215', membershipTier: '$$', membershipMonth: 'Jan 2026', category: 'caregiver', isUrgent: false },
+  { id: 'P-3', type: 'volunteer', name: 'Marcus Chen', pseudonym: 'Volunteer #V-405', category: 'befriending', isUrgent: false },
+  { id: 'P-4', type: 'volunteer', name: 'Elena Vance', pseudonym: 'Volunteer #V-406', category: 'general', isUrgent: false },
 ];
 
 const DEFAULT_UPDATES = [];
@@ -52,41 +54,111 @@ function canSeeCategory(category, role) {
   return role === 'volunteer' || role === 'caregiver';
 }
 
+/**
+ * Robust CSV Line Splitter / Parser
+ */
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const result = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line.startsWith('#')) continue; // Skip comments/sheet headers
+    
+    const row = [];
+    let inQuotes = false;
+    let currentToken = '';
+
+    for (let c = 0; c < line.length; c++) {
+      const char = line[c];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        row.push(currentToken.trim());
+        currentToken = '';
+      } else {
+        currentToken += char;
+      }
+    }
+    row.push(currentToken.trim());
+    result.push(row);
+  }
+  return result;
+}
+
+/**
+ * Real-time Sync from Google Sheets
+ */
+async function syncLiveGoogleSheetData() {
+  const CSV_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv`;
+
+  try {
+    const response = await fetch(CSV_URL);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const csvText = await response.text();
+    const rows = parseCSV(csvText);
+
+    const accountsHeaderIdx = rows.findIndex(r => r[0] === 'User ID');
+    const profilesHeaderIdx = rows.findIndex(r => r[0] === 'Profile ID');
+
+    if (accountsHeaderIdx !== -1) {
+      const parsedUsers = [];
+      const endIdx = profilesHeaderIdx !== -1 ? profilesHeaderIdx : rows.length;
+      
+      for (let i = accountsHeaderIdx + 1; i < endIdx; i++) {
+        const row = rows[i];
+        if (row.length >= 4 && row[1] && row[2]) {
+          parsedUsers.push({
+            id: row[0] || `u-${i}`,
+            username: row[1],
+            password: row[2],
+            role: row[3].toLowerCase(),
+            assignedProfile: row[4] || '',
+            membershipTier: row[5] || '',
+            membershipMonth: row[6] || ''
+          });
+        }
+      }
+      if (parsedUsers.length > 0) {
+        state.users = parsedUsers;
+      }
+    }
+
+    if (profilesHeaderIdx !== -1) {
+      const parsedProfiles = [];
+      for (let i = profilesHeaderIdx + 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length >= 7 && row[2] && row[3]) {
+          parsedProfiles.push({
+            id: row[0] || `p-${i}`,
+            type: (row[1] || 'client').toLowerCase(),
+            name: row[2],
+            pseudonym: row[3],
+            membershipTier: row[4] || '$',
+            membershipMonth: row[5] || 'Apr 2026',
+            category: (row[6] || 'general').toLowerCase(),
+            isUrgent: (row[7] || '').toUpperCase() === 'YES'
+          });
+        }
+      }
+      if (parsedProfiles.length > 0) {
+        state.profiles = parsedProfiles;
+      }
+    }
+
+    state.save();
+    renderApp();
+    console.log("Successfully synced live accounts and profiles from Google Sheet!");
+  } catch (error) {
+    console.warn("Using cached/local storage data fallback:", error);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   if (state.darkMode) document.documentElement.classList.add('dark');
   setupEventListeners();
-  syncLiveGoogleSheetData(); // Auto-syncs live data from your sheet on load
+  syncLiveGoogleSheetData();
 });
-
-/**
- * Automatically fetches live data from your Google Sheet tabs
- */
-async function syncLiveGoogleSheetData() {
-  // Replace gid=0 with your Accounts tab GID and gid=XXXXX with your Profiles tab GID
-  const ACCOUNTS_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
-  const PROFILES_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=YOUR_PROFILES_TAB_GID`;
-
-  try {
-    const [accountsRes, profilesRes] = await Promise.all([
-      fetch(ACCOUNTS_CSV_URL).catch(() => null),
-      fetch(PROFILES_CSV_URL).catch(() => null)
-    ]);
-
-    if (accountsRes && accountsRes.ok) {
-      const text = await accountsRes.text();
-      // Optional: Parse CSV text into state.users if needed
-      console.log("Successfully connected to Accounts tab on Google Drive.");
-    }
-
-    if (profilesRes && profilesRes.ok) {
-      const text = await profilesRes.text();
-      // Optional: Parse CSV text into state.profiles if needed
-      console.log("Successfully connected to Profiles tab on Google Drive.");
-    }
-  } catch (error) {
-    console.warn("Using local cached storage mode:", error);
-  }
-}
 
 function toggleDarkMode() {
   state.darkMode = !state.darkMode;
@@ -210,4 +282,178 @@ function renderProfiles(type) {
 
   container.innerHTML = filtered.map(profile => {
     const pUpdates = state.updates.filter(u => u.profileId === profile.id && canSeeCategory(u.category, state.role));
-    const membershipTag = profile.type === 'client' && profile.membershipTier ? ` <span class="font-mono text
+    const membershipTag = profile.type === 'client' && profile.membershipTier ? ` <span class="font-mono text-emerald-600">${profile.membershipTier} (${profile.membershipMonth || 'Apr 2026'})</span>` : '';
+    const urgentBadge = profile.isUrgent && state.role !== 'caregiver' ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-700 ml-2">URGENT</span>' : '';
+
+    return `
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border p-4 shadow-2xs space-y-3">
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">${profile.pseudonym}</span>
+            <h3 class="font-bold text-base mt-1">${profile.name} ${membershipTag} ${urgentBadge}</h3>
+            <span class="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">${profile.category}</span>
+          </div>
+        </div>
+        ${state.role !== 'caregiver' ? `
+          <div class="space-y-2 pt-2 border-t text-xs">
+            <p class="font-semibold text-slate-500">Updates (${pUpdates.length}):</p>${pUpdates.length === 0 ? '<p class="text-slate-400 italic">No visible updates.</p>' : pUpdates.map(u => `
+              <div class="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1">
+                <div class="flex justify-between text-[10px] text-slate-400"><span>[${u.date}] • ${u.category}</span><span>By ${u.author}</span></div>
+                <p>${u.notes}</p>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function renderUserManagement(container) {
+  container.innerHTML = `
+    <div class="bg-white dark:bg-slate-900 rounded-2xl border p-4 sm:p-5 shadow-2xs space-y-4">
+      <div class="flex justify-between items-center">
+        <div><h2 class="font-bold text-sm">Account Database</h2><p class="text-xs text-slate-500">Synced with Google Drive Master Sheet.</p></div>
+        <button onclick="document.getElementById('newUserModal').classList.remove('hidden')" class="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">+ Create</button>
+      </div>
+      <table class="w-full text-left text-xs">
+        <thead><tr class="border-b text-slate-400"><th class="pb-2">Username</th><th class="pb-2">Password</th><th class="pb-2">Role</th><th class="pb-2 text-right">Actions</th></tr></thead>
+        <tbody class="divide-y">
+          ${state.users.map(u => `
+            <tr>
+              <td class="py-3 font-mono font-bold">${u.username}</td>
+              <td class="py-3 font-mono">${u.password}</td>
+              <td class="py-3 uppercase text-[10px] font-bold"><span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">${u.role}</span></td>
+              <td class="py-3 text-right">${u.username !== 'admin' ? `<button onclick="deleteUser('${u.id}')" class="text-rose-600 font-semibold hover:underline">Delete</button>` : '<span class="text-slate-400">Locked</span>'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderStats() {
+  document.getElementById('statTotalProfiles').textContent = state.profiles.filter(p => p.type === (state.activeTab === 'clients' ? 'client' : 'volunteer')).length;
+  document.getElementById('statUrgentCount').textContent = state.profiles.filter(p => p.isUrgent).length;
+  document.getElementById('statTotalUpdates').textContent = state.updates.length;
+}
+
+function exportDataToExcel() {
+  let csv = "ID,Type,Name,Pseudonym,Membership,Category,Urgent\r\n";
+  state.profiles.forEach(p => { csv += `"${p.id}","${p.type}","${p.name}","${p.pseudonym}","${p.membershipTier || ''} ${p.membershipMonth || ''}","${p.category}","${p.isUrgent ? 'YES' : 'NO'}"\r\n`; });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `CareTrack_Export_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+}
+
+function saveNewUser(e) {
+  e.preventDefault();
+  const username = document.getElementById('nu_username').value.trim();
+  const password = document.getElementById('nu_password').value.trim();
+  const role = document.getElementById('nu_role').value;
+  state.users.push({ id: 'u-' + Date.now(), username, password, role });
+  state.save();
+  closeModals();
+  document.getElementById('newUserForm').reset();
+  renderApp();
+}
+
+function deleteUser(id) {
+  state.users = state.users.filter(u => u.id !== id);
+  state.save();
+  renderApp();
+}
+
+function openNewProfileModal() { document.getElementById('newProfileModal').classList.remove('hidden'); }
+function openNewUpdateModal() {
+  const targetTypeSelect = document.getElementById('nu_targetType');
+  if (state.role === 'volunteer') {
+    targetTypeSelect.value = 'client';
+    targetTypeSelect.disabled = true;
+  } else {
+    targetTypeSelect.disabled = false;
+  }
+  document.getElementById('nu_date').value = new Date().toISOString().split('T')[0];
+  updateUpdateProfileAutofillList();
+  document.getElementById('newUpdateModal').classList.remove('hidden');
+}
+function closeModals() { document.querySelectorAll('.modal-window').forEach(m => m.classList.add('hidden')); }
+
+function updateUpdateProfileAutofillList() {
+  const targetType = document.getElementById('nu_targetType').value;
+  const listEl = document.getElementById('profileAutofillList');
+  listEl.innerHTML = state.profiles.filter(p => p.type === targetType).map(p => `<option value="${p.name} (${p.pseudonym})"></option>`).join('');
+}
+
+function saveNewProfile(e) {
+  e.preventDefault();
+  const type = document.getElementById('np_type').value;
+  const name = document.getElementById('np_name').value.trim();
+  const category = document.getElementById('np_category').value;
+  const isUrgent = document.getElementById('np_isUrgent').checked;
+  const membershipTier = document.getElementById('np_membershipTier').value;
+  const membershipMonth = document.getElementById('np_membershipMonth').value.trim() || 'Apr 2026';
+
+  state.profiles.unshift({
+    id: 'p-' + Date.now(),
+    type,
+    name,
+    pseudonym: `${type === 'client' ? 'Client #C-' : 'Volunteer #V-'}${Math.floor(100 + Math.random() * 900)}`,
+    membershipTier,
+    membershipMonth,
+    category,
+    isUrgent
+  });
+  state.save();
+  closeModals();
+  document.getElementById('newProfileForm').reset();
+  renderApp();
+}
+
+function saveNewUpdate(e) {
+  e.preventDefault();
+  const targetType = document.getElementById('nu_targetType').value;
+  if (state.role === 'volunteer' && targetType === 'volunteer') {
+    alert('Volunteers cannot log updates for volunteers.');
+    return;
+  }
+  const searchInputVal = document.getElementById('nu_profileSearchInput').value.trim();
+  const matched = state.profiles.find(p => p.type === targetType && searchInputVal.includes(p.name));
+  if (!matched) return alert('Select a profile from the autofill list.');
+
+  state.updates.unshift({
+    id: 'up-' + Date.now(),
+    profileId: matched.id,
+    date: document.getElementById('nu_date').value,
+    category: document.getElementById('nu_category').value,
+    notes: document.getElementById('nu_notes').value.trim(),
+    author: state.currentUser
+  });
+  state.save();
+  closeModals();
+  document.getElementById('newUpdateForm').reset();
+  renderApp();
+}
+
+function setupEventListeners() {
+  document.getElementById('globalSearch')?.addEventListener('input', (e) => { state.searchQuery = e.target.value; renderProfiles(state.activeTab === 'clients' ? 'client' : 'volunteer'); });
+  document.getElementById('categoryFilterSelect')?.addEventListener('change', (e) => { state.categoryFilter = e.target.value; renderProfiles(state.activeTab === 'clients' ? 'client' : 'volunteer'); });
+}
+
+window.handleUserLogin = handleUserLogin;
+window.quickDemoUnlock = quickDemoUnlock;
+window.lockApplication = lockApplication;
+window.switchTab = switchTab;
+window.toggleDarkMode = toggleDarkMode;
+window.exportDataToExcel = exportDataToExcel;
+window.openNewProfileModal = openNewProfileModal;
+window.openNewUpdateModal = openNewUpdateModal;
+window.closeModals = closeModals;
+window.saveNewUser = saveNewUser;
+window.deleteUser = deleteUser;
+window.saveNewProfile = saveNewProfile;
+window.saveNewUpdate = saveNewUpdate;
+window.updateUpdateProfileAutofillList = updateUpdateProfileAutofillList;
