@@ -1,6 +1,6 @@
 /**
  * CareTrack Secure - Main Controller
- * Supports direct PIN unlock (8502 -> Julia) & Username/Password login.
+ * Integrated with Live Google Sheets multi-tab CSV parser & auto-sync.
  */
 
 const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
@@ -29,8 +29,8 @@ class AppState {
     this.darkMode = localStorage.getItem('caretrack_dark') === 'true';
     this.activeTab = 'clients';
 
-    this.users = JSON.parse(localStorage.getItem('caretrack_users') || 'null') || DEFAULT_USERS;
-    this.profiles = JSON.parse(localStorage.getItem('caretrack_profiles') || 'null') || DEFAULT_PROFILES;
+    this.users = DEFAULT_USERS;
+    this.profiles = DEFAULT_PROFILES;
     this.updates = JSON.parse(localStorage.getItem('caretrack_updates') || 'null') || DEFAULT_UPDATES;
     
     this.searchQuery = '';
@@ -105,7 +105,7 @@ async function syncLiveGoogleSheetData() {
           parsedUsers.push({
             id: row[0] || `u-${i}`,
             username: row[1],
-            password: row[2],
+            password: String(row[2]).trim(),
             role: row[3].toLowerCase(),
             assignedProfile: row[4] || '',
             membershipTier: row[5] || '',
@@ -161,9 +161,6 @@ function toggleDarkMode() {
   document.documentElement.classList.toggle('dark', state.darkMode);
 }
 
-/**
- * Handles PIN-only or Username + PIN unlock!
- */
 function handleUserLogin() {
   const usernameInput = (document.getElementById('loginUsername')?.value || '').trim().toLowerCase();
   const passwordInput = (document.getElementById('loginPassword')?.value || '').trim();
@@ -171,17 +168,17 @@ function handleUserLogin() {
 
   let matchedUser = null;
 
-  // 1. Check if entering PIN directly matching any user's password (e.g. 8502 -> Julia)
+  // 1. Direct PIN lookup against state.users (e.g., "1111" for David or "8502" for Julia)
   if (passwordInput) {
     matchedUser = state.users.find(x => String(x.password).trim() === passwordInput);
   }
 
-  // 2. Check Username + Password match if username was typed
+  // 2. Check Username + PIN combination if typed
   if (!matchedUser && usernameInput && passwordInput) {
     matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === passwordInput);
   }
 
-  // 3. Fallback for master PIN 1234
+  // 3. Fallback for Master Admin PIN "1234"
   if (!matchedUser && (passwordInput === '1234' || (usernameInput === 'admin' && passwordInput === '1234'))) {
     matchedUser = { username: 'admin', role: 'admin' };
   }
