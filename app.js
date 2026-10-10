@@ -1,11 +1,11 @@
 /**
  * CareTrack Secure - Main Controller
- * Integrated with Live Google Sheets multi-tab CSV parser & auto-sync.
+ * PIN-Only Login Enabled (8502 -> Julia [Admin], 1111 -> David [Caregiver], 2222 -> Marcus [Volunteer])
  */
 
 const SPREADSHEET_ID = "1ssFs1Thl8CNW06EvlTHFr-Hz_lhYnBS5RAFzJw7-Txo";
 
-const DEFAULT_USERS = [
+const HARDCODED_USERS = [
   { id: 'U-001', username: 'admin', password: '1234', role: 'admin' },
   { id: 'U-002', username: 'Julia', password: '8502', role: 'admin' },
   { id: 'U-003', username: 'caregiver_david', password: '1111', role: 'caregiver' },
@@ -29,7 +29,7 @@ class AppState {
     this.darkMode = localStorage.getItem('caretrack_dark') === 'true';
     this.activeTab = 'clients';
 
-    this.users = DEFAULT_USERS;
+    this.users = HARDCODED_USERS;
     this.profiles = DEFAULT_PROFILES;
     this.updates = JSON.parse(localStorage.getItem('caretrack_updates') || 'null') || DEFAULT_UPDATES;
     
@@ -114,8 +114,11 @@ async function syncLiveGoogleSheetData() {
         }
       }
       if (parsedUsers.length > 0) {
-        state.users = parsedUsers;
-        localStorage.setItem('caretrack_users', JSON.stringify(parsedUsers));
+        // Merge Google Sheet users with hardcoded defaults to ensure Julia (8502) and David (1111) are always present
+        const combinedMap = new Map();
+        HARDCODED_USERS.forEach(u => combinedMap.set(String(u.password).trim(), u));
+        parsedUsers.forEach(u => combinedMap.set(String(u.password).trim(), u));
+        state.users = Array.from(combinedMap.values());
       }
     }
 
@@ -138,14 +141,13 @@ async function syncLiveGoogleSheetData() {
       }
       if (parsedProfiles.length > 0) {
         state.profiles = parsedProfiles;
-        localStorage.setItem('caretrack_profiles', JSON.stringify(parsedProfiles));
       }
     }
 
     state.save();
     renderApp();
   } catch (error) {
-    console.warn("Using cached data fallback:", error);
+    console.warn("Using default internal user fallback:", error);
   }
 }
 
@@ -161,26 +163,31 @@ function toggleDarkMode() {
   document.documentElement.classList.toggle('dark', state.darkMode);
 }
 
+/**
+ * Handles Direct PIN Unlock!
+ */
 function handleUserLogin() {
+  const pinInput = (document.getElementById('loginPassword')?.value || '').trim();
   const usernameInput = (document.getElementById('loginUsername')?.value || '').trim().toLowerCase();
-  const passwordInput = (document.getElementById('loginPassword')?.value || '').trim();
   const errorEl = document.getElementById('pinError');
+
+  if (errorEl) errorEl.classList.add('hidden');
 
   let matchedUser = null;
 
-  // 1. Direct PIN lookup against state.users (e.g., "1111" for David or "8502" for Julia)
-  if (passwordInput) {
-    matchedUser = state.users.find(x => String(x.password).trim() === passwordInput);
+  // 1. Direct PIN lookup against all registered passcodes (e.g., 8502 -> Julia, 1111 -> David, 2222 -> Marcus)
+  if (pinInput) {
+    matchedUser = state.users.find(x => String(x.password).trim() === pinInput);
   }
 
-  // 2. Check Username + PIN combination if typed
-  if (!matchedUser && usernameInput && passwordInput) {
-    matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === passwordInput);
+  // 2. Direct Username + PIN lookup if username provided
+  if (!matchedUser && usernameInput && pinInput) {
+    matchedUser = state.users.find(x => x.username.trim().toLowerCase() === usernameInput && String(x.password).trim() === pinInput);
   }
 
-  // 3. Fallback for Master Admin PIN "1234"
-  if (!matchedUser && (passwordInput === '1234' || (usernameInput === 'admin' && passwordInput === '1234'))) {
-    matchedUser = { username: 'admin', role: 'admin' };
+  // 3. Admin fallback for PIN 1234
+  if (!matchedUser && (pinInput === '1234' || pinInput === '8502')) {
+    matchedUser = pinInput === '8502' ? { username: 'Julia', role: 'admin' } : { username: 'admin', role: 'admin' };
   }
 
   if (matchedUser) {
